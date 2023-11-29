@@ -3,7 +3,7 @@ title: "Homework 5"
 output:
   word_document: default
   html_document: default
-date: "2023-10-31"
+date: "2023-11-29"
 ---
 
 
@@ -38,7 +38,7 @@ library(tigris)
 
 
 
-#Q1
+#Choice A
 
 ```{r}
 #Loading data and creating object
@@ -49,14 +49,6 @@ homicides <- homicides %>%
   mutate(city_name = str_c(city, state, sep = ", ")) %>%
   select(city_name, everything()) %>%
   filter( city_name == "Baltimore, MD")
-```
-
-
-
-
-```{r}
-homicides_2 <- homicides[complete.cases(homicides$lat, homicides$lon), ]
-
 ```
 
 
@@ -84,8 +76,6 @@ plot_data <- homicides_sf %>%
   )
 
 ```
-
-
 
 
 

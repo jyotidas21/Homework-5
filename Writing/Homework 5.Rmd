@@ -1,0 +1,232 @@
+---
+title: "Homework 4"
+output:
+  word_document: default
+  html_document: default
+date: "2023-10-31"
+---
+
+
+```{r setup, include=FALSE}
+#Retain (and do not edit) this code chunk!!!
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(error = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(fig.height = 8)
+
+```
+
+
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(forcats)
+library(ggplot2)
+library(ggthemes)
+library(broom)
+library(purrr)
+library(tidyr)
+library(scales)
+library(sf)
+library(tigris)
+
+```
+
+
+
+#Q1
+
+```{r}
+#Loading data and creating object
+
+homicides <- read.csv("homicide-data.csv")
+
+homicides <- homicides %>%
+  mutate(city_name = str_c(city, state, sep = ", ")) %>%
+  select(city_name, everything())
+```
+
+
+
+#Q2
+
+```{r}
+#Creating unsolved dataframe
+
+unsolved <- homicides %>%
+  group_by(city_name) %>%
+  summarize(
+    total_homicides = n(),
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest")))
+
+```
+
+
+
+#Q3
+
+```{r}
+#Subset of the data for Baltimore, MD
+baltimore_data <- subset(homicides, city_name == "Baltimore, MD")
+
+#Calculating the proportion and confidence interval
+prop_test_result <- prop.test(
+  sum(baltimore_data$disposition %in% c("Closed without arrest", "Open/No arrest")),
+  nrow(baltimore_data),
+  conf.level = 0.95
+)
+
+print(prop_test_result)
+```
+
+```{r}
+
+# Applying tidy function to the prop.test result
+tidy_result <- tidy(prop_test_result)
+
+#Estimating proportion and confidence intervals
+proportion_estimate <- tidy_result$estimate
+confidence_intervals <- tidy_result[c("conf.low", "conf.high")]
+
+
+print(proportion_estimate)
+print(confidence_intervals)
+
+```
+
+
+
+#Q4
+
+```{r}
+#Converting unsolved_homicides to numeric
+unsolved <- unsolved %>%
+  mutate(unsolved_homicides = as.numeric(unsolved_homicides))
+
+#Creating a function to perform prop.test and tidy on each city
+city_prop_test <- function(city_data) {
+  prop_test_result <- prop.test(
+    sum(city_data$unsolved_homicides),
+    nrow(city_data),
+    conf.level = 0.95
+    )
+  tidy_result <- broom::tidy(prop_test_result)
+  tidy_result
+}
+
+city_homicide_result <- unsolved %>%
+  mutate(prop_per_city = map2(.x = unsolved_homicides,
+                              .y = total_homicides,
+                              ~ prop.test(x = .x, n = .y))) %>%
+  mutate(prop_per_city = map(.x = prop_per_city,
+                             ~ tidy(.x))) %>%
+  unnest(cols = c(prop_per_city))
+
+```
+
+
+
+#Q5
+
+```{r}
+city_homicide_result %>% 
+  ggplot(aes(x = estimate, y = reorder(city_name, estimate), xmin = conf.low,
+                                       xmax = conf.high)) +
+           geom_errorbarh(height = 0, color = "white") +
+           geom_point(size = 1.5, color = "white") +
+           labs(y = NULL, x = "Percent of homicide that are unsolved",
+                title = "Unsolved homicide by city", subtitle = "Bars show 95% confidence interval") +
+           scale_x_continuous(labels = percent_format(accuracy = .1)) +
+           theme(panel.background = element_rect(fill = "grey48"),
+                 panel.grid = element_line(color = "gray43"))
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+city_boundaries <- tigris::tracts("MD", cb = TRUE, year = 2019) %>%
+  filter(NAME == "Baltimore")
+
+```
+
+```{r}
+baltimore_counties <- counties(state = "MD", cb = TRUE, year = 2019) %>%
+  filter(NAME == "Baltimore")
+
+baltimore_counties2 <- baltimore_counties %>% slice(2)
+```
+
+```{r}
+homicides_2 <- homicides[complete.cases(homicides$lat, homicides$lon), ]
+
+```
+
+
+```{r}
+homicides_sf <- st_as_sf(homicides_2, coords = c("lat", "lon"), crs = 4326)
+
+```
+
+
+```{r}
+# Assuming x and y are your spatial objects
+st_crs(homicides_sf)
+st_crs(baltimore_counties2)
+
+
+# Assuming baltimore_counties2 is your spatial object
+baltimore_counties2 <- st_transform(baltimore_counties2, "+proj=longlat +datum=WGS84 +no_defs")
+
+```
+
+
+
+```{r}
+# Merge homicides with city boundaries
+homicides_with_counties <- st_join(homicides_sf, baltimore_counties2)
+
+```
+
+```{r}
+# Create a simplified dataframe for plotting
+plot_data <- homicides_with_counties %>%
+  mutate(
+    race_group = fct_lump(victim_race, n = 3),
+    solved_unsolved = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), "Unsolved", "Solved")
+  )
+
+```
+
+
+```{r}
+# Create the plot
+ggplot() +
+  geom_sf(data = baltimore_counties2, fill = "lightgrey", color = "white") +
+  geom_sf(data = plot_data, aes(color = victim_race), size = 2) +
+  geom_point(data = plot_data, aes(color = victim_race)) +
+  facet_grid(solved_unsolved ~ .) +
+  scale_color_manual(values = c("red", "green", "blue")) +
+  labs(title = "Homicides in Your City", subtitle = "Solved vs. Unsolved, by Race") +
+  theme_minimal()
+
+```
+
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:

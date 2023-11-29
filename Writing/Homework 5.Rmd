@@ -47,7 +47,8 @@ homicides <- read.csv("homicide-data.csv")
 
 homicides <- homicides %>%
   mutate(city_name = str_c(city, state, sep = ", ")) %>%
-  select(city_name, everything())
+  select(city_name, everything()) %>%
+  filter( city_name == "Baltimore, MD")
 ```
 
 
@@ -59,63 +60,24 @@ homicides_2 <- homicides[complete.cases(homicides$lat, homicides$lon), ]
 ```
 
 
-```{r}
-city_boundaries <- tigris::tracts("MD", cb = TRUE, year = 2019) %>%
-  filter(NAME == "Baltimore")
-
-```
 
 ```{r}
-baltimore_counties_test <- counties(state = "MD", cb = TRUE, year = 2019) %>%
-  filter(NAME == "Baltimore") %>% slice(1)
-
-```
-
-
-```{r}
-baltimore_counties <- counties(state = "MD", cb = TRUE, year = 2019) %>%
-  filter(NAME == "Baltimore")
-
-baltimore_counties2 <- baltimore_counties %>% slice(2)
-```
-
-
-
-
-```{r}
-homicides_sf <- st_as_sf(homicides_2, coords = c("lat", "lon"), crs = 4326)
-
-```
-
-```{r}
-homicides_sf_test <- st_as_sf(homicides_2, coords = c("lat", "lon"), crs = 4326) %>%
-  filter(city == "Baltimore")
-
-```
-
-
-```{r}
-#x and y are the spatial objects
-st_crs(homicides_sf)
-st_crs(baltimore_counties2)
-
-
-# Assuming baltimore_counties2 is your spatial object
-baltimore_counties2 <- st_transform(baltimore_counties2, "+proj=longlat +datum=WGS84 +no_defs")
+city_boundaries <- tigris::block_groups(state = "MD",county = "Baltimore city")
 
 ```
 
 
 
 ```{r}
-# Merge homicides with city boundaries
-homicides_with_counties <- st_join(homicides_sf, baltimore_counties2)
+homicides_sf <- st_as_sf(homicides, coords = c("lon", "lat"), crs = 4326)
 
 ```
+
+
 
 ```{r}
 # Create a simplified dataframe for plotting
-plot_data <- homicides_with_counties %>%
+plot_data <- homicides_sf %>%
   mutate(
     race_group = fct_lump(victim_race, n = 3),
     solved_unsolved = ifelse(disposition %in% c("Closed without arrest", "Open/No arrest"), "Unsolved", "Solved")
@@ -124,26 +86,15 @@ plot_data <- homicides_with_counties %>%
 ```
 
 
-```{r}
-ggplot() + 
-  geom_sf(data = baltimore_counties_test, color = "lightgray") + 
-  geom_sf(data = homicides_sf_test, aes(color = victim_race))
-```
 
 
 
 ```{r}
 # Create the plot
 ggplot() +
-  geom_sf(data = baltimore_counties2, fill = "lightgrey", color = "white", alpha = 0.5) +
-  geom_sf(data = plot_data, aes(color = race_group), size = 2) 
-
-```
-
-+
-  geom_point(data = plot_data, aes(x = geometry, y =  color = victim_race)) +
+  geom_sf(data = city_boundaries) +
+  geom_sf(data = plot_data, aes(color = race_group), size = 2) +
   facet_grid(solved_unsolved ~ .) +
-  scale_color_manual(values = c("red", "green", "blue")) +
   labs(title = "Homicides in Your City", subtitle = "Solved vs. Unsolved, by Race") +
   theme_minimal()
 

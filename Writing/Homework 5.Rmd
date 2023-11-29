@@ -51,11 +51,12 @@ homicides <- homicides %>%
 ```
 
 
+
+
 ```{r}
 homicides_2 <- homicides[complete.cases(homicides$lat, homicides$lon), ]
 
 ```
-
 
 
 ```{r}

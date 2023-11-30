@@ -3,6 +3,7 @@ title: "Homework 5"
 output:
   word_document: default
   html_document: default
+  pdf_document: default
 date: "2023-11-29"
 ---
 
@@ -54,7 +55,7 @@ homicides <- homicides %>%
 
 
 ```{r}
-city_boundaries <- tigris::block_groups(state = "MD",county = "Baltimore city")
+city_boundaries <- block_groups(state = "MD",county = "Baltimore city")
 
 ```
 
